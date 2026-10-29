@@ -1053,3 +1053,84 @@ export async function downloadFinishedMatchesAsDuprCsv(filename = null, options 
 
   return downloadDuprCsv(finished, filename, options);
 }
+
+// ==========================================
+// 5. SESSION MANAGEMENT & FRESH START
+// ==========================================
+
+const SYSTEM_COLLECTION = 'system';
+const CURRENT_SESSION_DOC = 'currentSession';
+
+/**
+ * Deletes all documents in a Firestore collection in batches of 400
+ */
+export async function clearCollection(collectionName) {
+  const snap = await getDocs(collection(db, collectionName));
+  const docs = snap.docs;
+  for (let i = 0; i < docs.length; i += 400) {
+    const batch = writeBatch(db);
+    const chunk = docs.slice(i, i + 400);
+    chunk.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  }
+}
+
+/**
+ * Subscribes to real-time updates for the current session metadata
+ */
+export function subscribeCurrentSession(callback, onError) {
+  const sessionDocRef = doc(db, SYSTEM_COLLECTION, CURRENT_SESSION_DOC);
+  return onSnapshot(
+    sessionDocRef,
+    (docSnap) => {
+      if (docSnap.exists()) {
+        callback({ id: docSnap.id, ...docSnap.data() });
+      } else {
+        callback(null);
+      }
+    },
+    onError
+  );
+}
+
+/**
+ * Resets the current meet-up:
+ * 1. Permanently clears all existing players and matches.
+ * 2. Initializes the new session document.
+ * 3. Optionally loads the new Reclub JSON attendees list.
+ */
+export async function resetSessionAndStartFresh({
+  sessionName = null,
+  courtCount = 2,
+  reclubJson = null
+} = {}) {
+  const now = new Date();
+  const defaultName = `Open Play - ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  const finalName = (sessionName || '').trim() || defaultName;
+
+  // 1. Wipe all existing players & matches
+  await clearCollection(PLAYERS_COLLECTION);
+  await clearCollection(MATCHES_COLLECTION);
+
+  // 2. Set new session metadata
+  const sessionDocRef = doc(db, SYSTEM_COLLECTION, CURRENT_SESSION_DOC);
+  await setDoc(sessionDocRef, {
+    name: finalName,
+    courtCount: Math.max(1, Number(courtCount) || 2),
+    status: 'active',
+    startedAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+
+  // 3. Import new players if Reclub JSON was provided
+  let importedPlayers = [];
+  if (reclubJson && reclubJson.trim()) {
+    importedPlayers = await importReclubPlayers(reclubJson.trim());
+  }
+
+  return {
+    sessionName: finalName,
+    courtCount: Math.max(1, Number(courtCount) || 2),
+    importedPlayersCount: importedPlayers.length
+  };
+}

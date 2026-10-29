@@ -7,7 +7,7 @@
           <span class="text-2xl">🏓</span>
           <div>
             <h1 class="text-base font-extrabold text-white tracking-tight flex items-center gap-2">
-              Pickleball Live View
+              {{ currentSession?.name || 'Pickleball Live View' }}
             </h1>
             <div class="flex items-center gap-1.5 text-[11px] text-slate-400">
               <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -238,8 +238,12 @@
           <span class="text-[11px] text-slate-400">{{ eligibleQueue.length }} active · {{ waitingQueue.length - eligibleQueue.length }} resting</span>
         </div>
 
-        <div v-if="waitingQueue.length === 0" class="p-8 text-center text-slate-400 text-xs">
-          Queue is currently empty!
+        <div v-if="waitingQueue.length === 0" class="p-8 text-center text-slate-400 text-xs flex flex-col items-center gap-2">
+          <span class="text-2xl">⏳</span>
+          <p class="font-semibold text-slate-300">Queue is currently empty</p>
+          <p class="text-[11px] text-slate-500">
+            {{ players.length === 0 ? 'Waiting for the coordinator to load players for this meet-up.' : 'All waiting players are currently on court!' }}
+          </p>
         </div>
 
         <div class="divide-y divide-slate-800">
@@ -289,6 +293,15 @@
               </span>
             </div>
           </div>
+        </div>
+
+        <!-- Empty Queue State -->
+        <div v-if="waitingQueue.length === 0" class="p-8 text-center text-slate-400 text-xs flex flex-col items-center gap-2">
+          <span class="text-2xl">⏳</span>
+          <p class="font-semibold text-slate-300">Queue is currently empty</p>
+          <p class="text-[11px] text-slate-500">
+            {{ players.length === 0 ? 'Waiting for the coordinator to load players for this meet-up.' : 'All waiting players are currently on court!' }}
+          </p>
         </div>
       </div>
     </main>
@@ -359,6 +372,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import {
   subscribePlayers,
   subscribeMatches,
+  subscribeCurrentSession,
   getWaitingQueue,
   getEligibleQueue,
   getActiveQueue,
@@ -370,6 +384,7 @@ const activeTab = ref('courts') // 'courts' | 'queue' | 'standings'
 const searchQuery = ref('')
 
 // Real-time Firestore state
+const currentSession = ref(null)
 const players = ref([])
 const matches = ref([])
 
@@ -378,6 +393,7 @@ const nowSeconds = ref(Math.floor(Date.now() / 1000))
 let timerInterval = null
 
 // Subscriptions
+let unsubSession = null
 let unsubPlayers = null
 let unsubMatches = null
 
@@ -495,6 +511,13 @@ function getElapsedTime(match) {
 }
 
 onMounted(() => {
+  unsubSession = subscribeCurrentSession(
+    (data) => {
+      currentSession.value = data
+    },
+    (err) => console.error('MobileView session error:', err)
+  )
+
   unsubPlayers = subscribePlayers(
     (data) => {
       players.value = data
@@ -515,6 +538,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (unsubSession) unsubSession()
   if (unsubPlayers) unsubPlayers()
   if (unsubMatches) unsubMatches()
   if (timerInterval) clearInterval(timerInterval)

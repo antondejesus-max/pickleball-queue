@@ -7,20 +7,34 @@
           🏓
         </div>
         <div>
-          <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-            Court Coordinator Admin
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+              {{ currentSession?.name || 'Pickleball Open Play' }}
+            </h1>
             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-              iPad View
+              Active Session
             </span>
-          </h1>
-          <p class="text-xs text-slate-400">
-            {{ waitingQueue.length }} in queue ({{ eligibleQueue.length }} ready) · {{ players.length }} total players · {{ inProgressMatches.length }} active court(s)
+          </div>
+          <p class="text-xs text-slate-400 mt-0.5">
+            {{ waitingQueue.length }} in queue ({{ eligibleQueue.length }} ready) · {{ players.length }} players · {{ inProgressMatches.length }} active court(s) · {{ completedMatches.length }} finished
           </p>
         </div>
       </div>
 
       <!-- Quick Action Buttons -->
       <div class="flex items-center flex-wrap gap-2.5">
+        <!-- Reset / New Session Button -->
+        <button
+          @click="openResetModal"
+          class="inline-flex items-center gap-2 px-3.5 py-2.5 bg-rose-600/90 hover:bg-rose-500 active:bg-rose-700 text-white rounded-xl font-medium text-sm transition-all shadow-md active:scale-95"
+          title="End this meetup and start fresh for a new Reclub game"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Reset / New Meetup
+        </button>
+
         <!-- Show QR Code Button -->
         <button
           @click="showQrModal = true"
@@ -585,6 +599,117 @@
         </div>
       </div>
     </div>
+
+    <!-- MODAL 4: Reset & Start Fresh Meet-up Session -->
+    <div
+      v-if="showResetModal"
+      class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+    >
+      <div class="bg-slate-800 border border-slate-700 rounded-3xl max-w-lg w-full p-6 shadow-2xl flex flex-col gap-5">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-700">
+          <div class="flex items-center gap-2.5">
+            <span class="text-2xl">🔄</span>
+            <div>
+              <h3 class="text-base font-bold text-white">Reset & Start Fresh Meet-up</h3>
+              <p class="text-xs text-slate-400">Finish current session and load new Reclub players</p>
+            </div>
+          </div>
+          <button @click="showResetModal = false" class="text-slate-400 hover:text-white text-lg">✕</button>
+        </div>
+
+        <!-- Warning Callout & DUPR Export Reminder -->
+        <div class="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex flex-col gap-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+              ⚠️ Current Session Data Notice
+            </span>
+            <span class="text-[11px] font-semibold text-slate-300">
+              {{ completedMatches.length }} matches · {{ players.length }} players
+            </span>
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Starting a fresh session will permanently wipe current players, active court games, and match history to prepare for the new Reclub meetup.
+          </p>
+          <div v-if="completedMatches.length > 0" class="pt-1">
+            <button
+              @click="handleExportDupr"
+              class="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-100 rounded-xl text-xs font-semibold border border-slate-600 shadow transition-colors"
+            >
+              📥 Download DUPR CSV Before Wiping ({{ completedMatches.length }} matches)
+            </button>
+          </div>
+        </div>
+
+        <!-- Form for Next Meetup -->
+        <div class="flex flex-col gap-3.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+              Next Meet-up / Session Name
+            </label>
+            <input
+              v-model="newSessionForm.name"
+              type="text"
+              placeholder="e.g. Open Play - Oct 30, 2026"
+              class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+              Number of Courts
+            </label>
+            <div class="grid grid-cols-4 gap-2">
+              <button
+                v-for="num in [1, 2, 3, 4]"
+                :key="num"
+                type="button"
+                @click="newSessionForm.courtCount = num"
+                class="py-2 rounded-xl text-xs font-bold border transition-all"
+                :class="
+                  newSessionForm.courtCount === num
+                    ? 'bg-emerald-600 text-white border-emerald-500 shadow-md'
+                    : 'bg-slate-900 text-slate-400 border-slate-700 hover:bg-slate-800'
+                "
+              >
+                {{ num }} {{ num === 1 ? 'Court' : 'Courts' }}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1 flex items-center justify-between">
+              <span>Paste Reclub JSON (Optional)</span>
+              <span class="text-[10px] text-slate-400 font-normal">Can also import later</span>
+            </label>
+            <textarea
+              v-model="newSessionForm.reclubJson"
+              rows="4"
+              placeholder='[ { "name": "Sarah Miller", "rating": 3.75 }, { "name": "Tom Chen" } ]'
+              class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs font-mono text-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            ></textarea>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-700">
+          <button
+            type="button"
+            @click="showResetModal = false"
+            class="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-700 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            @click="handleConfirmResetSession"
+            :disabled="isResettingSession"
+            class="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 active:bg-rose-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2"
+          >
+            <span v-if="isResettingSession" class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+            <span>{{ isResettingSession ? 'Resetting Session...' : 'Start Fresh Session' }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -594,6 +719,8 @@ import QrcodeVue from 'qrcode.vue'
 import {
   subscribePlayers,
   subscribeMatches,
+  subscribeCurrentSession,
+  resetSessionAndStartFresh,
   addWalkInPlayer,
   importReclubPlayers,
   updatePlayerStatus,
@@ -609,11 +736,21 @@ import {
 } from '../utils/queueEngine.js'
 
 // State
+const currentSession = ref(null)
 const players = ref([])
 const matches = ref([])
 const pairingMode = ref('balanced') // 'balanced' | 'random'
 const submittingMatchId = ref(null)
 const isStartingMatch = ref(false)
+
+// Reset / New Session Modal State
+const showResetModal = ref(false)
+const isResettingSession = ref(false)
+const newSessionForm = reactive({
+  name: '',
+  courtCount: 2,
+  reclubJson: ''
+})
 
 // Configured Courts
 const configuredCourts = ref([
@@ -913,11 +1050,60 @@ async function handleExportDupr() {
   }
 }
 
+// Reset / New Session Handlers
+function openResetModal() {
+  const todayStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  newSessionForm.name = `Open Play - ${todayStr}`
+  newSessionForm.courtCount = configuredCourts.value.length || 2
+  newSessionForm.reclubJson = ''
+  showResetModal.value = true
+}
+
+async function handleConfirmResetSession() {
+  isResettingSession.value = true
+  try {
+    const result = await resetSessionAndStartFresh({
+      sessionName: newSessionForm.name,
+      courtCount: newSessionForm.courtCount,
+      reclubJson: newSessionForm.reclubJson
+    })
+
+    // Update local configured courts to match new session court count
+    const courts = []
+    for (let i = 1; i <= result.courtCount; i++) {
+      courts.push({ id: `court-${i}`, name: `Court ${i}` })
+    }
+    configuredCourts.value = courts
+
+    showResetModal.value = false
+    alert(`Fresh session "${result.sessionName}" started! Loaded ${result.importedPlayersCount} players across ${result.courtCount} court(s).`)
+  } catch (err) {
+    alert(`Error resetting session: ${err.message}`)
+  } finally {
+    isResettingSession.value = false
+  }
+}
+
 // Lifecycle: Firestore Subscriptions & Timer
 let unsubPlayers = null
 let unsubMatches = null
+let unsubSession = null
 
 onMounted(() => {
+  unsubSession = subscribeCurrentSession(
+    (data) => {
+      currentSession.value = data
+      if (data && data.courtCount && configuredCourts.value.length !== data.courtCount) {
+        const courts = []
+        for (let i = 1; i <= data.courtCount; i++) {
+          courts.push({ id: `court-${i}`, name: `Court ${i}` })
+        }
+        configuredCourts.value = courts
+      }
+    },
+    (err) => console.error('Session listener error:', err)
+  )
+
   unsubPlayers = subscribePlayers(
     (data) => {
       players.value = data
@@ -938,6 +1124,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (unsubSession) unsubSession()
   if (unsubPlayers) unsubPlayers()
   if (unsubMatches) unsubMatches()
   if (timerInterval) clearInterval(timerInterval)
